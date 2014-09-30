@@ -1,0 +1,267 @@
+---
+title: Welcome to Sigmafield
+template: post.hbt
+date : 2013-10-29
+---
+
+
+**Update, Part 2** The following post appeared on my Blogistic
+Reflections blog back in 2009. I present it here in its original
+form. However, I no longer use this exact workflow. I am no longer
+blogging directly from org-mode. I am generating content using the
+rmarkdown and a hybrid static-site generation method using gulp and
+metalsmith. This was all written pre-knitr, pre-rmarkdown, pre-etc. 
+
+**Update, Part 1** The following post appeared on my Blogistic
+Reflections blog back in 2009. I present it here in its original
+form. However, I no longer use this exact workflow. I am still
+blogging directly from org-mode, but this process has been streamlined
+significantly with the
+[org2blog](https://github.com/punchagan/org2blog) package. The
+org-babel functionality mentioned in the Conclusion has also matured
+and is now part of org-mode. Org2blog works great with source code.
+
+
+Welcome to Blogistic Reflections (5 Years Later)
+===
+
+  [John Tukey's](http://en.wikipedia.org/wiki/John_Tukey) preface to
+  [Exploratory Data Analysis](http://books.google.com/books?id=UT9dAAAAIAAJ&dq=Exploratory+Data+Analysis&q=what+you+can+do#search_ancho)
+  begins with a useful rule, "It is important to understand what you
+  *can do* before you learn to measure how *well* you seem to have
+  *done* it." When I decided I wanted to start a blog concentrating on
+  statistics, R, and Emacs, I thought I had better learn first what I
+  can do to make the process of generating content easier. Here, as a
+  meta first post, I present how I used
+  [Emacs](http://www.emacswiki.org/), [R](http://www.R-project.org),
+  and other technologies to produce the output you are reading here.
+
+Emacs, ESS, and org-mode
+----
+
+I use Emacs for everything I can. I started learning it as a graduate
+student in Statistics in order to use the
+[ESS](http://ess.r-project.org) package. ESS lets you run R within
+Emacs, which is really nice for developing programs and performing
+data analysis *interactively*. I have discovered many Emacs packages
+through the years, but lately I have been learning the excellent
+[org-mode](http://orgmode.org) package. Org-mode is designed so that
+you can get started with very minimal knowledge of its capabilities.
+You can ignore the more complicated aspects of it if you do not need
+them, and still have a great system for general organizational tasks
+and note taking. I think it is worth learning Emacs just so you can
+use org-mode!
+
+Since I am so familiar with Emacs, and work in it daily, I really
+wanted to use it to write posts. Ideally, I would like to write my
+blog entries in org-mode, and be able to use in-line R code. The text
+and R code should be output to HTML and published to my blog. This
+HTML generation is possible because org-mode has a fantastic feature
+that [exports](http://orgmode.org/manual/Exporting.html#Exporting) to various formats, including HTML.  This is beneficial
+since then all of my headlines, lists, tables, and source code markup
+in org-mode will be carried over to the HTML *automatically*.
+
+Using the tools already available for Emacs, creating the HTML turned
+out to be much easier than I initially thought.  The vast majority of
+the time preparing this was spent learning about those tools, and
+figuring out how to combine them in the right way to accomplish what I
+wanted to do.
+
+To summarize, my goals were to:
+
+1. write blog content in Emacs
+2. use org-mode to manage content
+3. be able to include R commands, output, and graphics easily
+4. automatically syntax highlight the R commands and output
+5. automatically syntax highlight other source code (e.g., elisp)
+6. generate HTML automatically directly from Emacs
+
+
+R, Sweave, and the ascii package
+----
+
+   I really enjoy using R.  Since I plan to write about statistics,
+   and especially statistical computing, I imagine many of my posts
+   will contain R code. R comes with an interesting function called
+   [Sweave](http://www.stat.uni-muenchen.de/~leisch/Sweave/).  Sweave
+   allows you to incorporate R commands within a document you are
+   writing wrapped in a special syntax, see some
+   [demos](http://www.stat.umn.edu/~charlie/Sweave/).  So you might be
+   writing some [LaTeX](http://www.latex-project.org) or HTML and
+   interweaving R code. After you run the Sweave function using the
+   source (e.g., HTML) document as the input, a new file is created
+   that replaces the R *code* with the *results* of the commands.
+   This might sound simple, but it leads to a very powerful model for
+   report generation and
+   [reproducible research](http://www.reproducibleresearch.net/blog/). My
+   goal was to somehow get publishable HTML from a source org-mode
+   file after running Sweave on it. For example, say I want to
+   generate 100 samples from a normal distribution with mean 10, and
+   summarize the results.
+
+```r
+  x <- rnorm(100, mean = 10, sd = 5)
+  summary(x)
+  sd(x)
+```
+
+I do not want to have to actually type any of the summary output, of
+course, but I also don't have to even copy and paste it.  What I can
+type is the R code to produce the output, and wrap it in Sweave
+syntax, like this:
+
+
+    <<>>=
+    x <- rnorm(100, mean = 10, sd = 5)
+    sd(x)
+    @
+
+When I prepare this post for publishing, Sweave will run the R code
+and insert the output *in place of* the Sweave commands.  I have
+wrapped the Sweave syntax in org-mode's special [BEGIN_SRC](http://orgmode.org/manual/Literal-examples.html) construct,
+so that when I export to HTML, org-mode will properly syntax highlight
+the output using the [htmlize](http://www.emacswiki.org/emacs/Htmlize) package, as inspired by [this](http://ruslanspivak.com/2007/08/18/htmlize-your-erlang-code-buffer/) post on
+using the htmlize package with Erlang.  The only [elisp](http://www.gnu.org/software/emacs/manual/html_node/elisp/index.html) I had to write
+was the following.
+
+```emacs
+    ;; export an org file into Wordpress-ready HTML 
+    (defun run-ascii-sweave-on-buffer ()                                               
+    (ess-command "library(ascii)\n")                                                                               
+    (ess-command (concat "Sweave(\"" (buffer-file-name)                                                            
+    		       "\", RweaveAsciidoc)\n")))                                                             
+                                                                                                                     
+    (defun sweave-and-htmlize-blog-entry ()                                                                          
+       "Run Sweave on current file and produce HTML                                                                  
+    ready for pasting to Wordpress. Copies text to kill-ring for                                                     
+    pasting. "                                                                                                       
+       (interactive)                                                                                                 
+       (save-excursion                                                                                               
+         (run-ascii-sweave-on-buffer)                                                                                
+         (let* ((name (buffer-file-name))                                                                            
+    	    (txt-filename (concat name ".txt"))                                                                  
+    	    (txt-buf (find-file txt-filename)))                                                                  
+           (message "Preparing HTML for '%s' ..." name)                                                              
+           (switch-to-buffer txt-buf)                                                                                
+           (revert-buffer t t t)                                                                                     
+           (goto-char (point-min))                                                                                   
+           (while (re-search-forward "BEGIN_SRC R" nil t)                                                            
+    	 (replace-match "BEGIN_SRC R-transcript" t nil))                                                         
+           (goto-char (point-min))                                                                                   
+           (while (re-search-forward "^----" nil t)                                                                  
+    	 (replace-match "" nil nil))                                                                             
+           (basic-save-buffer)                                                                                       
+           (switch-to-buffer (org-export-region-as-html                                                              
+    			  (point-min) (point-max) t "*HTML*"))                                                   
+           (kill-buffer txt-buf)                                                                                     
+           (while (re-search-forward "<pre " nil t)                                                                  
+    	 (replace-match                                                                                          
+    	  "<pre style=\"background-color:#FFFFE5; font-size:8pt;overflow:auto\""                                 
+    	  t nil))                                                                                                
+           (kill-ring-save (point-min) (point-max))                                                                  
+           (message "Finished Converting to Wordpress HTML" ))))                                                     
+                                                                                                                     
+                                                                                                                     
+    (define-key global-map (kbd "<f5>") 'sweave-and-htmlize-blog-entry)                                              
+                                                                                                                     
+    (defun htmlize-org-blog-entry ()                                                                                 
+       "Export current org file to produce HTML                                                                      
+    ready for pasting to Wordpress. Copies text to kill-ring."                                                       
+       (interactive)                                                                                                 
+       (save-excursion                                                                                               
+         (let* ((name (buffer-file-name)))                                                                           
+           (switch-to-buffer (org-export-region-as-html                                                              
+    			  (point-min) (point-max) t "*HTML*"))                                                   
+           (while (re-search-forward "<pre " nil t)                                                                  
+    	 (replace-match                                                                                          
+       "<pre style=\"background-color:#f3f3f3;font-size:90%;overflow:auto;padding:5pt;border:1pt solid #AEBDCC\" "   
+    	  t nil))                                                                                                
+           (kill-ring-save (point-min) (point-max))                                                                  
+           (message "Finished converting to HTML" ))))                                                               
+                                                                                                                     
+    (define-key global-map (kbd "<f5>") 'htmlize-org-blog-entry)                                                     
+```    
+    
+    
+All the first function is doing is running an input file (an org-mode file) through Sweave with the RweaveAsciidoc driver found in the R [ascii](http://eusebe.github.com/ascii/)
+package. It basically just puts in the R output as plain text, as
+opposed to LaTeX code or HTML.
+    
+The rest of the elisp function manipulates the output in some trivial
+ways. The explanation for the replacement of the four dashes is that
+the RweaveAsciidoc Sweave driver produces the dashed string both
+before and after the R output as a visual offset, since [asciidoc](http://www.methods.co.nz/asciidoc/) uses
+that as a markup indicator.  I did not need that, since my output will
+not be fed through asciidoc, but rather the org-mode HTML exporter, so
+I simply replace the dashes found at the beginning of a line with the
+empty string. The last trick I had to do was to replace the R syntax
+highlighting with R-transcript syntax highlighting, since the results
+of Sweave are essentially a transcript of the R commands entered, not
+the actual R code. Finally, the resulting HTML produced by the org
+exporter has its *pre* tags modified with custom colors and font size.
+
+What is left to do?
+-- 
+
+There are a few loose ends that I didn't have time to clean up yet. I
+would like to modify my Lisp function to work on regions if mark is
+set and transient-mark-mode is enabled.  As of now, it just works on
+the whole buffer.  The idea would be to have an org-mode file, say
+*blog.org*, that would have a top-level headline for each entry. You
+could then highlight that entry and publish it.  I realize this is
+fairly trivial to implement, but it is not done yet.
+
+I also want to investigate the
+[publishing](http://orgmode.org/org.html#Publishing) feature of
+org-mode, and see if there is any value add to using
+[weblogger](http://www.emacswiki.org/emacs/WebloggerMode) mode in
+Emacs. Using that, I could have a full Emacs solution to posting new
+entries, without even having to go into Wordpress to paste HTML as I
+have done now. As an aside, I found
+[longlines-mode](http://www.emacswiki.org/emacs/LongLines) in Emacs
+very useful for writing this post in org-mode, so that there are not
+newlines in random spots when the HTML is produced.
+
+I have not tested how plotting from R works in this system.  It would
+be great to be able to generate in-line graphics in my posts using R
+commands to construct plots.
+
+Finally, it looks like there is a really interesting project on
+[worg](http://orgmode.org/worg/) called
+[org-babel](http://orgmode.org/worg/org-contrib/babel/org-babel.php)
+that will allow not only weaving of R, but many other languages
+including Ruby, elisp, and shell scripts, turning org-mode into a
+platform for
+[literate programming](http://en.wikipedia.org/wiki/Literate_programming). I
+also just saw [blorgit](http://orgmode.org/worg/blorgit.php), a
+blogging engine in org-mode that makes use of the
+[git](http://git-scm.com/) version control system.
+
+My function provided above should work if you have a recent version of
+org-mode, R, ESS, and the ascii package installed on your system. I
+have bound the function to F5 on my keyboard, so just hitting F5 in my
+org-mode buffer will create an HTML buffer and copy its contents to
+the kill-ring for pasting into Wordpress.
+   
+
+Conclusion
+--
+
+When I started this process, I assumed I would have to write at least
+a few elisp functions, and possibly some extensions to org-mode,
+perhaps even an Sweave driver.  After thoroughly examining the
+available tools, I ended up only having to write, in effect, one lisp
+function, and that is only a utility function to automate the
+combination of solutions I found.  The moral is that while often times
+you will have to write your own functions to get the exact behavior
+you are after, it does pay to really research what is out there
+already.  I found a solution to my problem, org-mode, that allows a
+much more flexible framework for extensions and has been thoroughly
+tested. I now get to enjoy the benefits of whatever future
+enhancements org-mode comes up with, including extensions by other
+org-mode users.  In particular, the org-babel functionality looks very
+promising to replace or augment some of my work here. So before you
+write your own packages, research what others have already done. At
+the very least, you'll know what value you are adding by doing it your
+own way, which is the lesson I took away from Tukey's rule.
+
